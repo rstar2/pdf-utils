@@ -1,0 +1,11 @@
+{
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#242661",
+        "titleBar.activeBackground": "#323688",
+        "titleBar.activeForeground": "#FBFBFE"
+    },
+    "cSpell.words": [
+        "listr",
+        "termost"
+    ]
+}
