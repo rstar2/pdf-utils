@@ -5,7 +5,9 @@
   "keywords": [],
   "author": "Rumen Neshev <rstardev@abv.bg>",
   "license": "MIT",
-  "bin": "index.js",
+  "bin": {
+    "pdf-utils": "./index.js"
+  },
   "dependencies": {
     "@listr2/prompt-adapter-enquirer": "^2.0.0",
     "enquirer": "^2.4.1",
