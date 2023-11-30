@@ -1,6 +1,5 @@
 #! /usr/bin/env node
 
-const os = require("node:os");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 
@@ -12,8 +11,9 @@ const {
 } = require("@listr2/prompt-adapter-enquirer");
 // const { Confirm } = require("enquirer");
 
-const imagesToPdf = require("./lib/images-to-pdf.js");
-const mergePdfs = require("./lib/merge-pdf.js");
+const imagesToPdf = require("./lib/images.js");
+const mergePdfs = require("./lib/merge.js");
+const rotatePdfs = require("./lib/rotate.js");
 
 class ValidationError extends Error {
   constructor(message) {
@@ -107,7 +107,7 @@ program
 program
   .command({
     name: "merge",
-    description: "Create a PDF from a folder with PDFs",
+    description: "Create a single merged PDF from a folder with PDFs",
   })
   .option({
     key: "outFilename",
@@ -133,20 +133,7 @@ program
     description: `Title for the first page.
                  [Optional]`,
   })
-  .task({
-    key: "pdfs",
-    label: "Validate PDFs",
-    async handler(context) {
-      const inFolder = path.resolve(__dirname, context.inFolder);
-      const pdfs = await glob(`${inFolder}/*.pdf`);
-
-      if (!pdfs.length) throw new ValidationError("Found no PDFs");
-
-      logTaskOutput(`Found ${pdfs.length} PDFs`);
-
-      return pdfs;
-    },
-  })
+  .task(createTaskValidatePDFs({ sort: true }))
   .task(createTaskOutFile())
   .task({
     label: "Generate PDF",
@@ -159,6 +146,75 @@ program
       (context) => `Created single PDF from ${context.pdfs.length} PDFs`
     )
   );
+
+program
+  .command({
+    name: "rotate",
+    description: "Rotate a single PDF or all PDFs inside a folder",
+  })
+  .option({
+    key: "inFolder",
+    name: { long: "in", short: "i" },
+    description: `Input folder with PDFs.
+                 If not passed will be current folder.
+                 [Optional]`,
+    defaultValue: ".",
+  })
+  .option({
+    key: "overwrite",
+    name: { long: "overwrite", short: "w" },
+    description: `Whether to overwrite the inout PDF(s) with the rotated ones.
+                 False if not specified.`,
+    defaultValue: false,
+  })
+  .input({
+    type: "select",
+    key: "degrees",
+    label:
+      "Degrees angle with which to rotate each page. Note that rotation is page's property, so if applying multiple rotations only the last one is set?",
+    options: ["0", "90", "180", "270"],
+    defaultValue: "180",
+  })
+  .task(createTaskValidatePDFs())
+  .task({
+    label: (context) => `Rotate PDF${context.pdfs.length > 1 ? "s" : ""}`,
+    handler: async (context, argv) => {
+      await rotatePdfs(
+        context.pdfs,
+        +context.degrees,
+        context.overwrite,
+        false
+      );
+    },
+  })
+  .task(
+    createTaskSuccess(
+      (context) => `Rotated PDF${context.pdfs.length ? "s" : ""}`
+    )
+  );
+
+/**
+ * @param {{sort?: boolean}} param
+ */
+function createTaskValidatePDFs({ sort = false } = {}) {
+  return {
+    key: "pdfs",
+    label: "Validate PDFs",
+    async handler(context) {
+      const inFolder = path.resolve(__dirname, context.inFolder);
+      const pdfs = await glob(`${inFolder}/*.pdf`);
+
+      if (!pdfs.length) throw new ValidationError("Found no PDFs");
+
+      logTaskOutput(`Found ${pdfs.length} PDFs`);
+
+      // sort alphabetically using native algorithm
+      if (sort) pdfs.sort();
+
+      return pdfs;
+    },
+  };
+}
 
 function createTaskOutFile() {
   return {
