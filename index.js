@@ -1,5 +1,6 @@
 #! /usr/bin/env node
 
+const process = require("node:process");
 const path = require("node:path");
 const fs = require("node:fs/promises");
 
@@ -75,16 +76,28 @@ program
     description: `Title for the first page.
                  [Optional]`,
   })
+  .option({
+    key: "degrees",
+    name: { long: "rotate", short: "r" },
+    description: `Rotate the image before inserting them in the PDF.
+                 [Optional]
+    `,
+    defaultValue: 0
+  })
   .task({
     key: "images",
     label: "Validate PNG/JPG images",
     async handler(context) {
-      const inFolder = path.resolve(__dirname, context.inFolder);
+      const inFolder = path.resolve(process.cwd(), context.inFolder);
+      
       const images = await glob(`${inFolder}/*.{png,jpg,jpeg}`);
 
       if (!images.length) throw new ValidationError("Found no images");
 
       logTaskOutput(`Found ${images.length} images`);
+
+      // sort alphabetically using native algorithm
+      images.sort();
 
       return images;
     },
@@ -95,7 +108,7 @@ program
     handler: async (context, argv) => {
       // console.log(argv);
       // console.log(context);
-      await imagesToPdf(context.images, context.outFile, context.title, false);
+      await imagesToPdf(context.images, context.outFile, context.title, context.degrees, false);
     },
   })
   .task(
@@ -133,7 +146,7 @@ program
     description: `Title for the first page.
                  [Optional]`,
   })
-  .task(createTaskValidatePDFs({ sort: true }))
+  .task(createTaskValidatePDFs())
   .task(createTaskOutFile())
   .task({
     label: "Generate PDF",
@@ -193,15 +206,12 @@ program
     )
   );
 
-/**
- * @param {{sort?: boolean}} param
- */
-function createTaskValidatePDFs({ sort = false } = {}) {
+function createTaskValidatePDFs() {
   return {
     key: "pdfs",
     label: "Validate PDFs",
     async handler(context) {
-      const inFolder = path.resolve(__dirname, context.inFolder);
+      const inFolder = path.resolve(process.cwd(), context.inFolder);
       const pdfs = await glob(`${inFolder}/*.pdf`);
 
       if (!pdfs.length) throw new ValidationError("Found no PDFs");
@@ -209,7 +219,7 @@ function createTaskValidatePDFs({ sort = false } = {}) {
       logTaskOutput(`Found ${pdfs.length} PDFs`);
 
       // sort alphabetically using native algorithm
-      if (sort) pdfs.sort();
+      pdfs.sort();
 
       return pdfs;
     },
@@ -222,7 +232,7 @@ function createTaskOutFile() {
     // label: "Get the output file",
     async handler(context) {
       if (!context.outFilename) {
-        const inFolder = path.resolve(__dirname, context.inFolder);
+        const inFolder = path.resolve(process.cwd(), context.inFolder);
         context.outFilename = path.basename(inFolder);
       }
       if (!context.outFilename.endsWith(".pdf")) context.outFilename += ".pdf";
@@ -233,7 +243,7 @@ function createTaskOutFile() {
           {
             title: "Validate the output file",
             task: async (ctx, task) => {
-              const outFile = path.resolve(__dirname, ctx.outFilename);
+              const outFile = path.resolve(process.cwd(), ctx.outFilename);
               ctx.outFile = outFile;
 
               //   task.output = "writing something here";
